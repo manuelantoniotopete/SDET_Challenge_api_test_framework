@@ -8,14 +8,12 @@ from jsonschema  import validate
 
 logger = logging.getLogger(__name__)
 
-@pytest.mark.skip
 def test_get_all_users(base_url,environment):
     response = requests.get(f"{base_url}/{environment}/users")
     dataJSON = response.json()
     assert response.status_code == 200
     validate(dataJSON, schema=USER_ARRAY_SCHEMA)
 
-@pytest.mark.skip
 def test_create_a_new_user(base_url,environment,generate_random_data_user):
     url = f"{base_url}/{environment}/users"
     response = requests.post(url,json=generate_random_data_user) 
@@ -29,7 +27,7 @@ def test_create_a_new_user(base_url,environment,generate_random_data_user):
     # validate the return schema is the same than we spected
     validate(dataJSON, schema=USER_CREATE_USER)
 
-@pytest.mark.xfail(reason="BUG: API returns 500 instead of 409 on duplicate email (violates contract), schema documentation says should return 409 when email is duplicated.")
+@pytest.mark.xfail(reason="BUG-001: API returns 500 instead of 409 on duplicate email (violates contract), schema documentation says should return 409 when email is duplicated.")
 def test_valid_duplicate_email_user(base_url, environment, create_random_user_via_api):
     logger.info(f"User created: {create_random_user_via_api}")
     email_duplicate = create_random_user_via_api["email"]
@@ -64,3 +62,23 @@ def test_create_user_invalid_return_400(base_url, environment, invalid_payload, 
     validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
     assert expected_msg in dataJSON["error"].lower(), \
         f"Failed case: {description}. Expected '{expected_msg}' in '{dataJSON['error']}'"
+
+def test_get_user_by_email(base_url,environment, create_random_user_via_api):
+    email = create_random_user_via_api["email"]
+    url = f"{base_url}/{environment}/users/{email}"
+    response = requests.get(url)
+    assert response.status_code == 200
+    dataJSON = response.json()
+    validate(dataJSON, schema=USER_CREATE_USER)
+    assert dataJSON["email"] == create_random_user_via_api["email"]
+    assert dataJSON["name"] == create_random_user_via_api["name"]
+    assert dataJSON["age"] == create_random_user_via_api["age"]
+
+@pytest.mark.xfail(reason="BUG-003: API returns 500 instead of 404 for non-existent users (violates contract)")
+def test_get_user_not_found(base_url, environment, generate_random_data_user):
+    email = generate_random_data_user["email"]
+    url = f"{base_url}/{environment}/users/{email}"
+    response = requests.get(url)
+    assert response.status_code == 404
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)

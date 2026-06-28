@@ -36,4 +36,20 @@ an `@` symbol and creates the user, returning `201 Created`.
 ![Postman 201 on malformed email format](evidence/SSEvidence003.png)
 ![Postman get all users and there is user with not email format](evidence/SSEvidence004.png)
 
+## BUG-003 — GET /users/{email} returns 500 instead of 404 according API documentation for non-existent users
+According API documentation difne when endpoint `GET /users/{email}` is executed with an email that does not exist, 
+should return `404 Not Found`with an `ErrorResponse` body. Instead, the API returns
+`500 Internal Server Error`.
+
+**Steps to reproduce:**
+1- Send `GET /users/{email}` with email does not exist. (example. definitely_does_not_exist_12345@nowhere.com)
+
+**Expected:** `404 Not Found` with an `ErrorResponse` body.
+**Actual:** `500 Internal Server Error` with `{"error": "Internal server error"}`.
+
+**Evidence:** Automated test `test_get_user_not_found` + manual reproduction in Postman.
+
+![Postman get 500](evidence/SSEvidence005.png)
+
+
 
