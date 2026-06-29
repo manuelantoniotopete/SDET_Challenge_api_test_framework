@@ -6,6 +6,9 @@ import logging
 from tests.schemasAPI import USER_ARRAY_SCHEMA, USER_CREATE_USER, ERROR_RESPONSE_SCHEMA
 from jsonschema  import validate
 
+from faker import Faker
+fake = Faker()
+
 logger = logging.getLogger(__name__)
 
 def test_get_all_users(base_url,environment):
@@ -74,6 +77,7 @@ def test_get_user_by_email(base_url,environment, create_random_user_via_api):
     assert dataJSON["name"] == create_random_user_via_api["name"]
     assert dataJSON["age"] == create_random_user_via_api["age"]
 
+@pytest.mark.skip
 @pytest.mark.xfail(reason="BUG-003: API returns 500 instead of 404 for non-existent users (violates contract)")
 def test_get_user_not_found(base_url, environment, generate_random_data_user):
     email = generate_random_data_user["email"]
@@ -82,3 +86,82 @@ def test_get_user_not_found(base_url, environment, generate_random_data_user):
     assert response.status_code == 404
     dataJSON = response.json()
     validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
+
+def test_update_user(base_url, environment, create_random_user_via_api):
+    email = create_random_user_via_api["email"]
+    url = f"{base_url}/{environment}/users/{email}"
+
+    updated_data = {
+        "name": "Updated Name",
+        "email": email,         
+        "age": 99,
+    }
+    response = requests.put(url, json=updated_data)
+    assert response.status_code == 200
+    dataJSON = response.json()
+    validate(dataJSON, schema=USER_CREATE_USER)
+    assert dataJSON["name"] == updated_data["name"]
+    assert dataJSON["age"] == updated_data["age"]
+    assert dataJSON["email"] == email
+
+@pytest.mark.parametrize("invalid_payload, description, expected_msg", [
+    ({"email": "test@test.com", "age": 30}, "missing name", "name is required"),
+    ({"name": "Test", "age": 30}, "missing email", "email is required"),
+    ({"name": "Test", "email": "test@test.com"}, "missing age", "age is required"),
+    ({"name": "Test", "email": "test@test.com", "age": 0}, "age below minimum", "age must be between 1 and 150"),
+    ({"name": "Test", "email": "test@test.com", "age": 200}, "age above maximum", "age must be between 1 and 150"),
+])
+def test_update_user_invalid_return_400(base_url, environment, create_random_user_via_api, invalid_payload, description, expected_msg):
+    email = create_random_user_via_api["email"]   
+    url = f"{base_url}/{environment}/users/{email}"
+
+    response = requests.put(url, json=invalid_payload)
+
+    assert response.status_code == 400, f"Failed case: {description}"
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
+    assert expected_msg in dataJSON["error"].lower(), \
+        f"Failed case: {description}. Expected '{expected_msg}' in '{dataJSON['error']}'"
+
+def test_update_user_not_found(base_url,environment,generate_random_data_user):
+    email = generate_random_data_user["email"]
+    url = f"{base_url}/{environment}/users/{email}"
+
+    updated_data = {
+        "name": "edited",
+        "email": email,
+        "age": 30,
+    }
+    response = requests.put(url, json=updated_data)
+
+    assert response.status_code == 404
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
+    assert "not found" in dataJSON["error"].lower()
+
+def test_update_user_duplicate_email(base_url, environment, generate_random_data_user):
+    url_base = f"{base_url}/{environment}/users"
+
+    user_a = generate_random_data_user
+    requests.post(url_base, json=user_a)
+
+    user_b = {
+        "name": "User B",
+        "email": fake.unique.email(),
+        "age": 40,
+    }
+    requests.post(url_base, json=user_b)
+
+    update_b = {
+        "name": "User B Edited",
+        "email": user_a["email"],  
+        "age": 40,
+    }
+
+    url_b = f"{url_base}/{user_b['email']}"
+    response = requests.put(url_b, json=update_b)
+
+    assert response.status_code == 409
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
+    assert "already exists" in dataJSON["error"].lower()

@@ -1,6 +1,6 @@
 # Bug Report — User Management API
 
-This document will be used as a list of all the defects (bugs) founds while the proyect is building and running the automated test suite against the document sdet_challenge_api.yml
+This document will be used as a list of all the defects (bugs) founds while the project is building and running the automated test suite against the document sdet_challenge_api.yml
 Each bug represent cases where the API's behavior do not match as sdet_challenge_api.yml say.
 
 ## BUG-001 — POST /users returns 500 instead of 409 on duplicate email
