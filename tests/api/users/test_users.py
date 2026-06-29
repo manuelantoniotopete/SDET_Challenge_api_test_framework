@@ -165,23 +165,19 @@ def test_update_user_duplicate_email(base_url, environment, generate_random_data
     validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
     assert "already exists" in dataJSON["error"].lower()
 
-def test_delete_user(base_url, environment, create_random_user_via_api, request):
-    if environment == "prod":
-        request.node.add_marker(
-            pytest.mark.xfail(reason="BUG-004: DELETE auth broken in prod, returns 401 regardless of token")
-        )
-
+def test_delete_user(base_url, environment, create_random_user_via_api,auth_headers):
     email = create_random_user_via_api["email"]
     url = f"{base_url}/{environment}/users/{email}"
-    headers = {"Authentication": "validtoken"}
 
-    response = requests.delete(url, headers=headers)
+    response = requests.delete(url, headers=auth_headers)
     assert response.status_code == 204
+
 
 def test_delete_user_unauthorized(base_url, environment, create_random_user_via_api, request):
     if environment == "dev":
         request.node.add_marker(
-            pytest.mark.xfail(reason="BUG-004: dev does not enforce auth, DELETE succeeds without valid token")
+            pytest.mark.xfail(
+                reason="BUG-004: dev does not enforce authentication, DELETE succeeds without a valid token")
         )
 
     email = create_random_user_via_api["email"]
@@ -189,19 +185,15 @@ def test_delete_user_unauthorized(base_url, environment, create_random_user_via_
 
     response = requests.delete(url)   
     assert response.status_code == 401
-    validate(response.json(), schema=ERROR_RESPONSE_SCHEMA)
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)
 
-def test_delete_user_not_found(base_url, environment, generate_random_data_user, request):
-    if environment == "prod":
-        request.node.add_marker(
-            pytest.mark.xfail(
-                reason="BUG-004: prod auth always returns 401, blocking the 404 not-found path")
-        )
 
-    email = generate_random_data_user["email"]   
+def test_delete_user_not_found(base_url, environment, generate_random_data_user,auth_headers):
+    email = generate_random_data_user["email"]
     url = f"{base_url}/{environment}/users/{email}"
-    headers = {"Authentication": "validtoken"}
 
-    response = requests.delete(url, headers=headers)
+    response = requests.delete(url, headers=auth_headers)
     assert response.status_code == 404
-    validate(response.json(), schema=ERROR_RESPONSE_SCHEMA)
+    dataJSON = response.json()
+    validate(dataJSON, schema=ERROR_RESPONSE_SCHEMA)

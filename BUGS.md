@@ -52,30 +52,33 @@ should return `404 Not Found`with an `ErrorResponse` body. Instead, the API retu
 
 ![Postman get 500](evidence/SSEvidence005.png)
 
-## BUG-004 — DELETE /users/{email} authentication is inconsistent and broken between env prod and dev
+## BUG-004 — DELETE /users/{email} does not enforce authentication in dev
+
 **Severity:** High (security + contract violation)
-According API documentation define `DELETE /users/{email}` requires `Authentication` header. 
-But in the moment to execute and valid API scenarios, athentication behaves oppositely and incorrectly
-in each environment:
 
-- **dev:** Authentication is not enforced. The DELETE succeeds (204) regardless
-  of the header name (`Authentication` or `Authorization`).
-  This is a security concern: deletion is possible without valid credentials.
- **Evidence:** ![Postman get 204](evidence/SSEvidence006.png)
+According to the API documentation, `DELETE /users/{email}` requires an
+`Authentication` header, and the spec states that dev and prod behave identically.
+Using the documented token (`mysecrettoken`), the two environments behave differently:
 
-- **prod:** Authentication always fails. The DELETE returns 401 "Authentication
-  required" for every token value tested, making user deletion impossible.
- **Evidence:** ![Postman get 401](evidence/SSEvidence007.png)
+- **prod:** Authentication is enforced correctly. A DELETE with the valid token
+  succeeds (`204 No Content`), and a request with a missing or invalid token is
+  rejected (`401 Unauthorized`).
 
-Neither environment matches the contract, and the two environments do not share
-identical behavior.
+- **dev:** Authentication is NOT enforced. The DELETE succeeds (`204 No Content`)
+  with no token, an invalid token, or any header name (`Authentication` or
+  `Authorization`). This is a security concern: a user can be deleted without
+  valid credentials.
+  **Evidence:** ![Postman 204 without auth in dev](evidence/SSEvidence006.png)
 
-**Steps to reproduce:**
-- dev: DELETE /dev/users/{email} with any/no auth header → 204.
-- prod: DELETE /prod/users/{email} with any auth header → 401.
+Prod matches the contract, but dev does not, so the two environments do not share
+the "identical behavior" guaranteed by the specification.
 
-**Expected:** `201 No Content`.
-**Actual:** `401 Unauthorized`
+**Steps to reproduce (dev):**
+1. Create a user in dev.
+2. Send `DELETE /dev/users/{email}` with no `Authentication` header.
+
+**Expected:** `401 Unauthorized` (authentication is required per the contract).
+**Actual:** `204 No Content` — the user is deleted without authentication.
 
 
 

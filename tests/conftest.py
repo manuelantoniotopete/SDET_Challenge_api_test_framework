@@ -36,3 +36,7 @@ def create_random_user_via_api(base_url, environment, generate_random_data_user)
     response = requests.post(url, json=generate_random_data_user)
     assert response.status_code == 201
     return generate_random_data_user
+
+@pytest.fixture
+def auth_headers():
+    return {"Authentication": "mysecrettoken"}
